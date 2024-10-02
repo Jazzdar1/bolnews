@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clappr M3U Player with Buttons & CORS</title>
+    <style>
+        #channel-container {
+            margin: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* Space between buttons */
+        }
+        .channel-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .channel-button:hover {
+            background-color: #0056b3;
+        }
+        #player {
+            margin-top: 20px;
+        }
+        #loading {
+            display: none;
+            font-size: 18px;
+            margin: 20px;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">Loading channels, please wait...</div>
+    
+    <!-- Container for channel buttons -->
+    <div id="channel-container"></div>
+
+    <!-- Player container -->
+    <div id="player"></div>
+
+    <!-- Clappr Script -->
+    <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+
+    <script>
+        // M3U playlist URL
+        const playlistUrl = "https://m3u.ch/pl/7e2151d261b38026550bcad5e1b3d569_743a583d38db827dceddbff87baa5bd2.m3u";
+
+        // List of additional m3u8 streams
+        const additionalStreams = [
+            {
+                name: "Zee TV HD",
+                url: "https://d75dqofg5kmfk.cloudfront.net/bpk-tv/Zeetvhd1/default/index.m3u8"
+            },
+            {
+                name: "Zee Anmol",
+                url: "https://d75dqofg5kmfk.cloudfront.net/bpk-tv/Zeeanmol1/default/zeeanmol.m3u8"
+            },
+            {
+                name: "Zing",
+                url: "https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zing1/default/rriptv.m3u8"
+            },
+            {
+                name: "Zee TV HD (RRIPTV)",
+                url: "https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zeetvhd1/default/rriptv.m3u8"
+            },
+            {
+                name: "Zee Cinema HD",
+                url: "https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zeecinemahd1/default/rriptv.m3u8"
+            },
+            {
+                name: "AND TV HD",
+                url: "https://d75dqofg5kmfk.cloudfront.net/bpk-tv/Andtvhd1/default/andtvhd.m3u8"
+            },
+            {
+                name: "Zee Bangla Cinema",
+                url: "https://d1g8wgjurz8via.cloudfront.net/bpk-tv/Zeebanglacinema1/default/zeebanglacinema1.m3u8"
+            },
+            {
+                name: "UEFA Live",
+                url: "https://live-uefa-com.akamaized.net/hls/live/2036934/290824_UCLGS/master.m3u8"
+            },
+            {
+                name: "History Channel Hindi",
+                url: "https://amg01448-amg01448c16-samsung-in-3495.playouts.now.amagi.tv/playlist/amg01448-samsungindia-historychannelhindi-samsungin/playlist.m3u8"
+            },
+            {
+                name: "YT HLS Stream",
+                url: "https://ythls.armelin.one/channel/UCz2yxQJZgiB_5elTzqV7FiQ.m3u8"
+            }
+        ];
+
+        let player;
+
+        // Function to fetch and parse the M3U playlist
+        async function loadPlaylist() {
+            const loading = document.getElementById("loading");
+            loading.style.display = "block"; // Show loading message
+
+            try {
+                const response = await fetch(playlistUrl, { mode: 'cors' });
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const m3uData = await response.text();
+                parseM3U(m3uData);
+            } catch (error) {
+                console.error("Failed to fetch the playlist", error);
+                alert("Error loading channels. Please try again later."); // User feedback
+            } finally {
+                loading.style.display = "none"; // Hide loading message
+            }
+        }
+
+        // Function to parse the M3U playlist and populate the buttons
+        function parseM3U(m3u) {
+            const lines = m3u.split("\n");
+            let currentChannel = {};
+            const channels = [];
+
+            lines.forEach(line => {
+                if (line.startsWith("#EXTINF")) {
+                    const info = line.match(/#EXTINF:.*,(.*)/);
+                    if (info) {
+                        currentChannel.name = info[1];
+                    }
+
+                    const logo = line.match(/tvg-logo="([^"]*)"/);
+                    if (logo) {
+                        currentChannel.logo = logo[1];
+                    }
+                } else if (line.startsWith("http")) {
+                    currentChannel.url = line;
+                    channels.push({ ...currentChannel });
+                    currentChannel = {};  // Reset for next channel
+                }
+            });
+
+            populateButtons(channels);
+        }
+
+        // Populate buttons for each channel
+        function populateButtons(channels) {
+            const container = document.getElementById("channel-container");
+
+            // Populate main channels from M3U playlist
+            channels.forEach(channel => {
+                const button = document.createElement("button");
+                button.className = "channel-button";
+                button.innerText = channel.name;
+                button.setAttribute('data-url', channel.url);
+                button.setAttribute('data-logo', channel.logo);
+
+                // Add click event to play the channel
+                button.addEventListener("click", function() {
+                    const selectedUrl = this.getAttribute('data-url');
+                    const selectedLogo = this.getAttribute('data-logo');
+                    playChannel(selectedUrl, selectedLogo);
+                });
+
+                container.appendChild(button);
+            });
+
+            // Populate additional streams
+            additionalStreams.forEach(stream => {
+                const button = document.createElement("button");
+                button.className = "channel-button";
+                button.innerText = stream.name;
+                button.setAttribute('data-url', stream.url);
+                button.setAttribute('data-logo', '');
+
+                // Add click event for additional stream
+                button.addEventListener("click", function() {
+                    const selectedUrl = this.getAttribute('data-url');
+                    const selectedLogo = this.getAttribute('data-logo');
+                    playChannel(selectedUrl, selectedLogo);
+                });
+
+                container.appendChild(button);
+            });
+        }
+
+        // Function to play the selected channel in Clappr with CORS settings
+        function playChannel(url, logo) {
+            if (player) {
+                player.destroy();  // Destroy the old player instance
+            }
+
+            player = new Clappr.Player({
+                source: url,
+                parentId: "#player",
+                width: '100%',
+                height: 360,
+                poster: logo,  // Display channel logo
+                mimeType: "application/x-mpegURL", // For M3U8 streams
+                autoPlay: true,
+                crossorigin: "anonymous",  // Enable cross-origin for the video
+            });
+        }
+
+        // Load the playlist when the page loads
+        window.onload = loadPlaylist;
+
+    </script>
+
+</body>
+</html>
